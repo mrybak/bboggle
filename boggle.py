@@ -4,28 +4,37 @@ Usage:
 Examples:
     python3 boggle.py ESUSIMBEREDRBECA
     python3 boggle.py ESUSIMBEREDRBECA --word-length=5
+    python3 boggle.py ESUSIMBEREDRBECA --word-length=5 --moar
 """
 import argparse
+import enchant
 
-def load_words():
-    with open('words_alpha.txt') as word_file:
-        valid_words = set(word_file.read().split())
+class BBictionary(object):
 
-    return valid_words
+    def __init__(self, moar=False):
+        self.moar = moar
+        if self.moar:
+            with open('words_alpha.txt') as word_file:
+                self.english_words = set(word_file.read().split())
+        self.us_dict, self.gb_dict = enchant.Dict("en_US"), enchant.Dict("en_GB")
 
-english_words = load_words()
-
-def is_word(w):
-    return w.lower() in english_words
+    def is_word(self, w):
+        w = w.lower()
+        if self.moar:
+            return w in self.english_words \
+                    and not self.us_dict.check(w) and not self.gb_dict.check(w)
+        else:
+            return self.us_dict.check(w) or self.gb_dict.check(w)
 
 class BBoggleBoard(object):
     BOARD_SIZE = 4
     WORD_LENGTHS = list(range(3, 8))
 
-    def __init__(self, board):
+    def __init__(self, board, moar=False):
         """board : str length  BOARD_SIZE x BOARD_SIZE"""
         self.board = [board[i:i+BBoggleBoard.BOARD_SIZE]
                 for i in range(0, len(board), BBoggleBoard.BOARD_SIZE)]
+        self.dict = BBictionary(moar=moar)
 
     def neighbors(self, x, y):
         neighbors_coords = []
@@ -53,7 +62,7 @@ class BBoggleBoard(object):
 
     def find_words(self, x, y, length):
         words = self.find_words_rec(x, y, length, [])
-        return [w.lower() for w in words if is_word(w)]
+        return [w.lower() for w in words if self.dict.is_word(w)]
 
     def solve_for_length(self, word_length):
         print('Finding words of length {}'.format(word_length))
@@ -61,7 +70,7 @@ class BBoggleBoard(object):
         for i in range(BBoggleBoard.BOARD_SIZE):
             for j in range(BBoggleBoard.BOARD_SIZE):
                 words.update(self.find_words(i, j, word_length))
-        return words
+        return sorted(list(words))
 
     def solve_all(self):
         print('Solving entire board')
@@ -78,9 +87,11 @@ if __name__ == '__main__':
     parser.add_argument('board', help='A 16-character input board')
     parser.add_argument('--word-length', choices=BBoggleBoard.WORD_LENGTHS,
             type=int, help='The length of words you want to find')
+    parser.add_argument('--moar', action='store_true',
+            help='U want moar werdz?')
     args = parser.parse_args()
 
-    board = BBoggleBoard(args.board)
+    board = BBoggleBoard(args.board, moar=args.moar)
     if args.word_length:
         print(board.solve_for_length(args.word_length))
     else:
